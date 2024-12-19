@@ -16,10 +16,10 @@ def main():
         print(f'Error: {file} not found')
         sys.exit(1)
 
-    train, test = train_test_split(df, test_size=0.2)
+    train, test = train_test_split(df, test_size=0.2, random_state=42)
 
-    train.to_csv('train.csv', index=False)
-    test.to_csv('test.csv', index=False)
+    train.to_csv('data_training.csv', index=False)
+    test.to_csv('data_testing.csv', index=False)
 
 
 if __name__ == '__main__':
