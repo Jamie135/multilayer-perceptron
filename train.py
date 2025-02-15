@@ -6,7 +6,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
-from split import split
 
 
 def parse():
@@ -16,7 +15,7 @@ def parse():
     return args
 
 
-def format(data_train, data_test):
+def preprocess(data_train, data_test):
     # Normalization
     X_train = data_train.iloc[:, 2:].values
     X_test = data_test.iloc[:, 2:].values
@@ -53,17 +52,10 @@ def train(args: str = None):
     data_train = pd.read_csv('data_train.csv', header=None)
     data_test = pd.read_csv('data_test.csv', header=None)
 
-    X_train, X_test, y_train, y_test = format(data_train, data_test)
+    X_train, X_test, y_train, y_test = preprocess(data_train, data_test)
 
     # print(f"X_train: {X_train.shape}, X_test: {X_test.shape}")
     # print(f"y_train: {y_train.shape}, y_test: {y_test.shape}")
-
-
-
-
-
-
-
 
 
 def main():
