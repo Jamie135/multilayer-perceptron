@@ -4,6 +4,10 @@ from sklearn.model_selection import train_test_split
 
 
 def split(data):
+    """
+    Split data into train and test sets
+    """
+
     train, test = train_test_split(data, test_size=0.2, random_state=42)
     train.to_csv('data_train.csv', index=False)
     test.to_csv('data_test.csv', index=False)
