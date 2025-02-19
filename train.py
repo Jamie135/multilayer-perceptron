@@ -1,9 +1,11 @@
 import os
 import sys
+import tqdm
 import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from tqdm import trange
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 
@@ -79,8 +81,8 @@ def backward_propagation(layers, activations, X, y):
     input = [X] + activations
     output = activations[-1]
 
-    loss = loss(output, y)
-    gradients = gradients(output, y)
+    loss = compute_loss(output, y)
+    gradients = compute_gradients(output, y)
 
     for l in range(len(layers))[::-1]:
         layer = layers[l]
@@ -89,7 +91,7 @@ def backward_propagation(layers, activations, X, y):
     return np.mean(loss)
 
 
-def loss(output, y):
+def compute_loss(output, y):
     """
     Calculate the loss of the model using softmax and logs
     The purpose of log is to prevent overflows in exponential
@@ -105,7 +107,7 @@ def loss(output, y):
     return cross_entropy
 
 
-def gradients(output, y):
+def compute_gradients(output, y):
     """
     Calculate the gradients of the loss from on the output of the model
     
@@ -123,7 +125,37 @@ def gradients(output, y):
     return (- one_hot + softmax) / output.shape[0]
 
 
+def minibatches(X, y, batchsize=32):
+    """
+    Create minibatches of the dataset
+    """
+
+    assert len(X) == len(y)
+
+    indices = np.random.permutation(len(X))
+    for i in range(0, len(X) - batchsize + 1, batchsize):
+        suffled_indices = indices[i:i + batchsize]
+        # yield returns a tuple containing the inputs and targets for the current minibatch
+        # this allows the function to be used as a generator, producing one minibatch at a time
+        yield X[suffled_indices], y[suffled_indices]
+
+
+def predict(layers, X):
+    """
+    Performs a forward propagation through the layers
+    to compute the raw output scores for each input (X) sample
+    by finding the index of the maximum score for each sample
+    """
+
+    output = forward_propagation(layers, X)[-1]
+    return output.argmax(axis=-1)
+
+
 def train(args: str = None):
+    """
+    Train the model
+    """
+
     if not (os.path.isfile("data_train.csv") or os.path.isfile("data_test.csv")):
         raise FileNotFoundError(f"Dataset files not found.")
 
@@ -136,6 +168,44 @@ def train(args: str = None):
     # print(f"y_train: {y_train.shape}, y_test: {y_test.shape}")
 
     layers = []
+    layers.append(Dense(X_train.shape[1], 50))
+    layers.append(ReLU())
+    layers.append(Dense(50, 100))
+    layers.append(ReLU())
+    layers.append(Dense(100, 2))
+    layers.append(Sigmoid())
+
+    train_loss = []
+    test_loss = []
+    train_acc = []
+    test_acc = []
+
+    for i in range(2500):
+        for X_batch, y_batch in minibatches(X_train, y_train, batchsize=32):
+            propagation(layers, X_batch, y_batch)
+    
+        train_loss.append(propagation(layers, X_train, y_train))
+        test_loss.append(propagation(layers, X_test, y_test))
+        train_acc.append(np.mean(predict(layers, X_train) == y_train))
+        test_acc.append(np.mean(predict(layers, X_test) == y_test))
+
+        print("Epoch", i + 1)
+        print("Train loss:", train_loss[-1])
+        print("Validation loss:", test_loss[-1])
+        print("Train accuracy:", train_acc[-1])
+        print("Validation accuracy:", test_acc[-1])
+        print("\n")
+
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 2, 1)
+    plt.plot(train_loss, label='train loss')
+    plt.plot(test_loss, label='test loss')
+    plt.legend()
+    plt.subplot(1, 2, 2)
+    plt.plot(train_acc, label='train accuracy')
+    plt.plot(test_acc, label='test accuracy')
+    plt.legend()
+    plt.show()
 
 
 def main():
