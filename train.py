@@ -1,11 +1,10 @@
 import os
 import sys
-import tqdm
+import json
 import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from tqdm import trange
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 
@@ -18,7 +17,8 @@ def parse():
     """
 
     parser = argparse.ArgumentParser()
-    # parser.add_argument("--options")
+    parser.add_argument("-hidden", "--hidden", type=str, default="relu", help="Activation function in the hidden layers")
+    parser.add_argument("-output", "--output", type=str, default="softmax", help="Activation function in the output layer")
     args = parser.parse_args()
     return args
 
@@ -48,6 +48,37 @@ def preprocess(data_train, data_test):
     y_test = label_encoder.fit_transform(y_test)
 
     return X_train_normalized, X_test_normalized, y_train, y_test
+
+
+def create_layers(X, hidden, output):
+    """
+    Create the layers of the model
+    """
+
+    layers = []
+    activations = {
+        "leakyrelu": LeakyReLU,
+        "relu": ReLU,
+    }
+
+    if hidden not in activations:
+        raise ValueError(f"Activation function not supported: {hidden}")
+
+    layers.append(Dense(X.shape[1], 64))
+    layers.append(activations[hidden]())
+
+    for _ in range(4):
+        layers.append(Dense(64, 64))
+        layers.append(activations[hidden]())
+
+    layers.append(Dense(64, 2))
+
+    if output == "sigmoid":
+        layers.append(Sigmoid())
+    else:
+        layers.append(Softmax())
+
+    return layers
 
 
 def propagation(layers, X, y):
@@ -93,25 +124,26 @@ def backward_propagation(layers, activations, X, y):
 
 def compute_loss(output, y):
     """
-    Calculate the loss of the model using softmax and logs
-    The purpose of log is to prevent overflows in exponential
-
-    - current_output: output of the model in 2D array of shape (batch, classes)
+    Calculate the binary cross entropy loss of the model.
+    - output: predicted results of the model in 2D array of shape (batch, classes) 
     - y: expected results in 1D array of shape (batch,) 
     """
+    epsilon = 1e-15
+    output = np.clip(output, epsilon, 1 - epsilon)
 
-    # get the scores corresponding to the correct answers
-    target_scores = output[np.arange(len(output)), y]
+    # transform y with one-hot matrix to have the same shape as output
+    y_one_hot = np.zeros_like(output)
+    y_one_hot[np.arange(len(output)), y] = 1
 
-    cross_entropy = - target_scores + np.log(np.sum(np.exp(output), axis=-1))
-    return cross_entropy
+    loss = - (y_one_hot * np.log(output) + (1 - y_one_hot) * np.log(1 - output))
+    return np.mean(loss, axis=-1)
 
 
 def compute_gradients(output, y):
     """
     Calculate the gradients of the loss from on the output of the model
     
-    - current_output: output of the model in 2D array of shape (batch, classes)
+    - output: predicted results of the model in 2D array of shape (batch, classes)
     - y: expected results in 1D array of shape (batch,) 
     """
 
@@ -151,6 +183,23 @@ def predict(layers, X):
     return output.argmax(axis=-1)
 
 
+def save_model(layers):
+    """
+    Save the model to a JSON file
+    """
+
+    model = []
+    for l in layers:
+        if isinstance(l, Dense):
+            layer = {
+                'weights': l.weights.tolist(),
+                'biases': l.biases.tolist()
+            }
+            model.append(layer)
+    with open('model.json', 'w') as f:
+        json.dump(model, f)
+
+
 def train(args: str = None):
     """
     Train the model
@@ -167,23 +216,18 @@ def train(args: str = None):
     # print(f"X_train: {X_train.shape}, X_test: {X_test.shape}")
     # print(f"y_train: {y_train.shape}, y_test: {y_test.shape}")
 
-    layers = []
-    layers.append(Dense(X_train.shape[1], 50))
-    layers.append(ReLU())
-    layers.append(Dense(50, 100))
-    layers.append(ReLU())
-    layers.append(Dense(100, 2))
-    layers.append(Sigmoid())
+    layers = create_layers(X_train, args.hidden, args.output)
 
     train_loss = []
     test_loss = []
     train_acc = []
     test_acc = []
 
-    for i in range(2500):
+    for i in range(1500):
         for X_batch, y_batch in minibatches(X_train, y_train, batchsize=32):
             propagation(layers, X_batch, y_batch)
-    
+        # propagation(layers, X_train, y_train)
+
         train_loss.append(propagation(layers, X_train, y_train))
         test_loss.append(propagation(layers, X_test, y_test))
         train_acc.append(np.mean(predict(layers, X_train) == y_train))
@@ -207,6 +251,12 @@ def train(args: str = None):
     plt.legend()
     plt.show()
 
+    try:
+        os.remove("model.json")
+    except OSError:
+        pass
+    save_model(layers)
+
 
 def main():
     try:
@@ -218,6 +268,7 @@ def main():
     except ValueError as v:
         print(v)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -1,1 +1,5 @@
 __pycache__/
+model.joblib
+model.json
+data_test.csv
+data_train.csv
