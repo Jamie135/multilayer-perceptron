@@ -5,10 +5,10 @@ import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from layers import *
+from propagation import *
 
 
 def parse():
@@ -16,9 +16,31 @@ def parse():
     Parse arguments
     """
 
+    def valid_layers(value):
+        ivalue = int(value)
+        if ivalue < 2 or ivalue > 50:
+            raise argparse.ArgumentTypeError(f"{value} is an invalid value")
+        return ivalue
+    
+    def valid_epochs(value):
+        ivalue = int(value)
+        if ivalue < 1 or ivalue > 10000:
+            raise argparse.ArgumentTypeError(f"{value} is an invalid value")
+        return ivalue
+    
+    def valid_learning(value):
+        fvalue = float(value)
+        if fvalue < 1 and fvalue > 0:
+            return fvalue
+        else:
+            raise argparse.ArgumentTypeError(f"{value} is an invalid value")
+    
     parser = argparse.ArgumentParser()
-    parser.add_argument("-hidden", "--hidden", type=str, default="relu", help="Activation function in the hidden layers")
-    parser.add_argument("-output", "--output", type=str, default="softmax", help="Activation function in the output layer")
+    parser.add_argument("-l", "--layers", type=valid_layers, help="Number of hidden layers")
+    parser.add_argument("-e", "--epochs", type=valid_epochs, default=1000, help="Number of hidden layers")
+    parser.add_argument("-lr", "--learning", type=valid_learning, default=0.001, help="Number of hidden layers")
+    parser.add_argument("-hl", "--hidden", type=str, default="relu", help="Activation function in the hidden layers")
+    parser.add_argument("-ol", "--output", type=str, default="softmax", help="Activation function in the output layer")
     args = parser.parse_args()
     return args
 
@@ -30,10 +52,10 @@ def preprocess(data_train, data_test):
     """
 
     # Normalization
-    X_train = data_train.drop(data_train.columns[1], axis=1)
-    X_test = data_test.drop(data_test.columns[1], axis=1)
+    X_train = data_train.iloc[:, 2:]
+    X_test = data_test.iloc[:, 2:]
 
-    scaler = MinMaxScaler()
+    scaler = StandardScaler()
 
     X_train_normalized = scaler.fit_transform(X_train.values)
     X_test_normalized = scaler.fit_transform(X_test.values)
@@ -50,12 +72,12 @@ def preprocess(data_train, data_test):
     return X_train_normalized, X_test_normalized, y_train, y_test
 
 
-def create_layers(X, hidden, output):
+def create_layers(X, hidden, output, learning_rate, layers=None):
     """
     Create the layers of the model
     """
 
-    layers = []
+    network = []
     activations = {
         "leakyrelu": LeakyReLU,
         "relu": ReLU,
@@ -64,100 +86,31 @@ def create_layers(X, hidden, output):
     if hidden not in activations:
         raise ValueError(f"Activation function not supported: {hidden}")
 
-    layers.append(Dense(X.shape[1], 64))
-    layers.append(activations[hidden]())
+    network.append(Dense(X.shape[1], 64, learning_rate))
+    network.append(activations[hidden](learning_rate))
 
-    for _ in range(4):
-        layers.append(Dense(64, 64))
-        layers.append(activations[hidden]())
+    if layers:
+        layers_number = layers
+    if hidden == "relu" and layers == None:
+        layers_number = 10
+    elif hidden == "leakyrelu" and layers == None:
+        layers_number = 4
 
-    layers.append(Dense(64, 2))
+    for _ in range(layers_number):
+        network.append(Dense(64, 64, learning_rate))
+        network.append(activations[hidden](learning_rate))
+
+    network.append(Dense(64, 2, learning_rate))
 
     if output == "sigmoid":
-        layers.append(Sigmoid())
+        network.append(Sigmoid())
     else:
-        layers.append(Softmax())
+        network.append(Softmax())
 
-    return layers
-
-
-def propagation(layers, X, y):
-    """
-    Use forward and backward propagation to train the model
-    """
-
-    activations = forward_propagation(layers, X)
-    loss = backward_propagation(layers, activations, X, y)
-    return loss
+    return network
 
 
-def forward_propagation(layers, X):
-    """
-    Apply activation functions to the hidden layers
-    """
-
-    activations = []
-    input = X
-    for l in layers:
-        activations.append(l.forward(input))
-        input = activations[-1]
-    return activations
-
-
-def backward_propagation(layers, activations, X, y):
-    """
-    Update the weights of the model by propagating the gradients in backward
-    """
-
-    input = [X] + activations
-    output = activations[-1]
-
-    loss = compute_loss(output, y)
-    gradients = compute_gradients(output, y)
-
-    for l in range(len(layers))[::-1]:
-        layer = layers[l]
-        gradients = layer.backward(input[l], gradients)
-    
-    return np.mean(loss)
-
-
-def compute_loss(output, y):
-    """
-    Calculate the binary cross entropy loss of the model.
-    - output: predicted results of the model in 2D array of shape (batch, classes) 
-    - y: expected results in 1D array of shape (batch,) 
-    """
-    epsilon = 1e-15
-    output = np.clip(output, epsilon, 1 - epsilon)
-
-    # transform y with one-hot matrix to have the same shape as output
-    y_one_hot = np.zeros_like(output)
-    y_one_hot[np.arange(len(output)), y] = 1
-
-    loss = - (y_one_hot * np.log(output) + (1 - y_one_hot) * np.log(1 - output))
-    return np.mean(loss, axis=-1)
-
-
-def compute_gradients(output, y):
-    """
-    Calculate the gradients of the loss from on the output of the model
-    
-    - output: predicted results of the model in 2D array of shape (batch, classes)
-    - y: expected results in 1D array of shape (batch,) 
-    """
-
-    # create an array of zeros with the same shape as the output
-    one_hot = np.zeros_like(output)
-
-    # set the value of the correct answers to 1 in the one_hot array
-    one_hot[np.arange(len(output)), y] = 1
-
-    softmax = np.exp(output) / np.exp(output).sum(axis=-1, keepdims=True)
-    return (- one_hot + softmax) / output.shape[0]
-
-
-def minibatches(X, y, batchsize=32):
+def minibatches(X, y, batchsize=8):
     """
     Create minibatches of the dataset
     """
@@ -172,30 +125,23 @@ def minibatches(X, y, batchsize=32):
         yield X[suffled_indices], y[suffled_indices]
 
 
-def predict(layers, X):
-    """
-    Performs a forward propagation through the layers
-    to compute the raw output scores for each input (X) sample
-    by finding the index of the maximum score for each sample
-    """
-
-    output = forward_propagation(layers, X)[-1]
-    return output.argmax(axis=-1)
-
-
-def save_model(layers):
+def save_model(layers, hidden, output, learning_rate):
     """
     Save the model to a JSON file
     """
 
-    model = []
+    model = {}
+    model['layers'] = []
     for l in layers:
         if isinstance(l, Dense):
             layer = {
+                'units': l.input_unit,
+                'activation': hidden if l.input_unit != 2 else output,
                 'weights': l.weights.tolist(),
                 'biases': l.biases.tolist()
             }
-            model.append(layer)
+            model['layers'].append(layer)
+    model['learning_rate'] = learning_rate
     with open('model.json', 'w') as f:
         json.dump(model, f)
 
@@ -205,35 +151,41 @@ def train(args: str = None):
     Train the model
     """
 
-    if not (os.path.isfile("data_train.csv") or os.path.isfile("data_test.csv")):
+    if not (os.path.isfile("data/data_training.csv") or os.path.isfile("data/data_test.csv")):
         raise FileNotFoundError(f"Dataset files not found.")
 
-    data_train = pd.read_csv('data_train.csv', header=None)
-    data_test = pd.read_csv('data_test.csv', header=None)
+    data_train = pd.read_csv('data/data_training.csv', header=None)
+    data_test = pd.read_csv('data/data_test.csv', header=None)
 
     X_train, X_test, y_train, y_test = preprocess(data_train, data_test)
 
     # print(f"X_train: {X_train.shape}, X_test: {X_test.shape}")
     # print(f"y_train: {y_train.shape}, y_test: {y_test.shape}")
 
-    layers = create_layers(X_train, args.hidden, args.output)
+    layers = create_layers(X_train, args.hidden, args.output, args.learning, args.layers)
 
     train_loss = []
     test_loss = []
     train_acc = []
     test_acc = []
 
-    for i in range(1500):
-        for X_batch, y_batch in minibatches(X_train, y_train, batchsize=32):
+    # if args.hidden == "leakyrelu" and args.epochs:
+    #     epochs = 500
+    # else:
+    #     epochs = args.epochs
+    epochs = args.epochs
+
+    for i in range(epochs):
+        for X_batch, y_batch in minibatches(X_train, y_train):
             propagation(layers, X_batch, y_batch)
         # propagation(layers, X_train, y_train)
 
         train_loss.append(propagation(layers, X_train, y_train))
         test_loss.append(propagation(layers, X_test, y_test))
-        train_acc.append(np.mean(predict(layers, X_train) == y_train))
-        test_acc.append(np.mean(predict(layers, X_test) == y_test))
+        train_acc.append(np.mean(scores(layers, X_train, phase='train') == y_train))
+        test_acc.append(np.mean(scores(layers, X_test, phase='train') == y_test))
 
-        print("Epoch", i + 1)
+        print(f"Epoch {i + 1}/{epochs}")
         print("Train loss:", train_loss[-1])
         print("Validation loss:", test_loss[-1])
         print("Train accuracy:", train_acc[-1])
@@ -255,7 +207,7 @@ def train(args: str = None):
         os.remove("model.json")
     except OSError:
         pass
-    save_model(layers)
+    save_model(layers, args.hidden, args.output, args.learning)
 
 
 def main():

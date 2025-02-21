@@ -35,7 +35,7 @@ class Dense(Layer):
     Hidden layer that applies affine transformation
     """
 
-    def __init__(self, input_unit, output_unit, learning_rate=0.001, initialization="he"):
+    def __init__(self, input_unit, output_unit, learning_rate, initialization="he"):
         """
         Constructor of the Dense class that initializes the weights, biases and learning rate
         """
@@ -82,10 +82,11 @@ class ReLU(Layer):
     This activation function is used to replace all the negative values in the input by 0
     """
 
-    def __init__(self):
+    def __init__(self, learning_rate):
         """
         Constructor of the ReLU class
         """
+        self.learning_rate = learning_rate
         pass
 
 
@@ -109,7 +110,7 @@ class LeakyReLU(Layer):
     This activation function allows a small gradient when the input is negative
     """
 
-    def __init__(self, learning_rate=0.001):
+    def __init__(self, learning_rate):
         """
         Constructor of the LeakyReLU class
         :param learning_rate: Slope of the function when input is negative
@@ -136,33 +137,6 @@ class LeakyReLU(Layer):
         grad_input = np.ones_like(input)
         grad_input[input <= 0] = self.learning_rate
         return grad_output * grad_input
-
-
-class Sigmoid(Layer):
-    """
-    Hidden layer that applies the sigmoid activation function
-    """
-
-    def __init__(self):
-        """
-        Constructor of the Sigmoid class
-        """
-        pass
-
-
-    def forward(self, input):
-        """
-        Apply the sigmoid function
-        """
-        return 1 / (1 + np.exp(-input))
-    
-
-    def backward(self, input, grad_output):
-        """
-        Compute the gradient of the loss on the input
-        """
-        A = 1 / (1 + np.exp(-input))
-        return grad_output * A * (1 - A)
 
 
 class Softmax(Layer):
@@ -200,3 +174,30 @@ class Softmax(Layer):
             jacobian_matrix = np.diag(p) - np.outer(p, p)
             dinput[i] = np.dot(jacobian_matrix, grad_output[i])
         return dinput
+
+
+class Sigmoid(Layer):
+    """
+    Hidden layer that applies the sigmoid activation function
+    """
+
+    def __init__(self):
+        """
+        Constructor of the Sigmoid class
+        """
+        pass
+
+
+    def forward(self, input):
+        """
+        Apply the sigmoid function
+        """
+        return 1 / (1 + np.exp(-input))
+    
+
+    def backward(self, input, grad_output):
+        """
+        Compute the gradient of the loss on the input
+        """
+        A = 1 / (1 + np.exp(-input))
+        return grad_output * A * (1 - A)
