@@ -76,6 +76,34 @@ class Dense(Layer):
         return grad_input
 
 
+class Sigmoid(Layer):
+    """
+    Hidden layer that applies the sigmoid activation function
+    """
+
+    def __init__(self, learning_rate):
+        """
+        Constructor of the Sigmoid class
+        """
+        self.learning_rate = learning_rate
+        pass
+
+
+    def forward(self, input):
+        """
+        Apply the sigmoid function
+        """
+        return 1 / (1 + np.exp(-input))
+    
+
+    def backward(self, input, grad_output):
+        """
+        Compute the gradient of the loss on the input
+        """
+        A = 1 / (1 + np.exp(-input))
+        return grad_output * A * (1 - A)
+
+
 class ReLU(Layer):
     """
     Hidden layer that applies the ReLU activation function (Rectified Linear Unit)
@@ -174,30 +202,3 @@ class Softmax(Layer):
             jacobian_matrix = np.diag(p) - np.outer(p, p)
             dinput[i] = np.dot(jacobian_matrix, grad_output[i])
         return dinput
-
-
-class Sigmoid(Layer):
-    """
-    Hidden layer that applies the sigmoid activation function
-    """
-
-    def __init__(self):
-        """
-        Constructor of the Sigmoid class
-        """
-        pass
-
-
-    def forward(self, input):
-        """
-        Apply the sigmoid function
-        """
-        return 1 / (1 + np.exp(-input))
-    
-
-    def backward(self, input, grad_output):
-        """
-        Compute the gradient of the loss on the input
-        """
-        A = 1 / (1 + np.exp(-input))
-        return grad_output * A * (1 - A)

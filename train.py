@@ -39,8 +39,7 @@ def parse():
     parser.add_argument("-l", "--layers", type=valid_layers, help="Number of hidden layers")
     parser.add_argument("-e", "--epochs", type=valid_epochs, default=1000, help="Number of hidden layers")
     parser.add_argument("-lr", "--learning", type=valid_learning, default=0.001, help="Number of hidden layers")
-    parser.add_argument("-hl", "--hidden", type=str, default="relu", help="Activation function in the hidden layers")
-    parser.add_argument("-ol", "--output", type=str, default="softmax", help="Activation function in the output layer")
+    parser.add_argument("-a", "--hidden", type=str, default="relu", help="Activation function in the hidden layers")
     args = parser.parse_args()
     return args
 
@@ -72,15 +71,16 @@ def preprocess(data_train, data_test):
     return X_train_normalized, X_test_normalized, y_train, y_test
 
 
-def create_layers(X, hidden, output, learning_rate, layers=None):
+def create_layers(X, hidden, learning_rate, layers=None):
     """
     Create the layers of the model
     """
 
     network = []
     activations = {
-        "leakyrelu": LeakyReLU,
         "relu": ReLU,
+        "leakyrelu": LeakyReLU,
+        "sigmoid": Sigmoid
     }
 
     if hidden not in activations:
@@ -92,25 +92,21 @@ def create_layers(X, hidden, output, learning_rate, layers=None):
     if layers:
         layers_number = layers
     if hidden == "relu" and layers == None:
-        layers_number = 10
-    elif hidden == "leakyrelu" and layers == None:
-        layers_number = 4
+        layers_number = 9
+    elif (hidden == "leakyrelu" or hidden == "sigmoid") and layers == None:
+        layers_number = 2
 
-    for _ in range(layers_number):
+    for _ in range(layers_number - 1):
         network.append(Dense(64, 64, learning_rate))
         network.append(activations[hidden](learning_rate))
 
     network.append(Dense(64, 2, learning_rate))
-
-    if output == "sigmoid":
-        network.append(Sigmoid())
-    else:
-        network.append(Softmax())
+    network.append(Softmax())
 
     return network
 
 
-def minibatches(X, y, batchsize=8):
+def minibatches(X, y, batchsize=16):
     """
     Create minibatches of the dataset
     """
@@ -125,7 +121,7 @@ def minibatches(X, y, batchsize=8):
         yield X[suffled_indices], y[suffled_indices]
 
 
-def save_model(layers, hidden, output, learning_rate):
+def save_model(layers, hidden, learning_rate):
     """
     Save the model to a JSON file
     """
@@ -136,7 +132,7 @@ def save_model(layers, hidden, output, learning_rate):
         if isinstance(l, Dense):
             layer = {
                 'units': l.input_unit,
-                'activation': hidden if l.input_unit != 2 else output,
+                'activation': hidden,
                 'weights': l.weights.tolist(),
                 'biases': l.biases.tolist()
             }
@@ -162,7 +158,7 @@ def train(args: str = None):
     # print(f"X_train: {X_train.shape}, X_test: {X_test.shape}")
     # print(f"y_train: {y_train.shape}, y_test: {y_test.shape}")
 
-    layers = create_layers(X_train, args.hidden, args.output, args.learning, args.layers)
+    layers = create_layers(X_train, args.hidden, args.learning, args.layers)
 
     train_loss = []
     test_loss = []
@@ -207,7 +203,7 @@ def train(args: str = None):
         os.remove("model.json")
     except OSError:
         pass
-    save_model(layers, args.hidden, args.output, args.learning)
+    save_model(layers, args.hidden, args.learning)
 
 
 def main():
