@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.metrics import f1_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from layers import *
@@ -40,6 +41,7 @@ def parse():
     parser.add_argument("-e", "--epochs", type=valid_epochs, default=1000, help="Number of hidden layers")
     parser.add_argument("-lr", "--learning", type=valid_learning, default=0.001, help="Number of hidden layers")
     parser.add_argument("-a", "--hidden", type=str, default="relu", help="Activation function in the hidden layers")
+    parser.add_argument("-es", "--earlystop", type=bool, default=False, help="Early stopping")
     args = parser.parse_args()
     return args
 
@@ -164,13 +166,26 @@ def train(args: str = None):
     test_loss = []
     train_acc = []
     test_acc = []
+    train_f1 = []
+    test_f1 = []
 
-    # if args.hidden == "leakyrelu" and args.epochs:
-    #     epochs = 500
-    # else:
-    #     epochs = args.epochs
     epochs = args.epochs
 
+    # Initialize live plot
+    plt.ion()
+    fig, ax = plt.subplots(3, 1, figsize=(10, 12))
+    ax[0].set_title('Loss')
+    ax[1].set_title('Accuracy')
+    ax[2].set_title('F1-Score')
+    ax[0].set_xlabel('Epoch')
+    ax[1].set_xlabel('Epoch')
+    ax[2].set_xlabel('Epoch')
+    ax[0].set_ylabel('Loss')
+    ax[1].set_ylabel('Accuracy')
+    ax[2].set_ylabel('F1-Score')
+
+    best_val_loss = float('inf')
+    patience_counter = 0
     for i in range(epochs):
         for X_batch, y_batch in minibatches(X_train, y_train):
             propagation(layers, X_batch, y_batch)
@@ -181,6 +196,11 @@ def train(args: str = None):
         train_acc.append(np.mean(scores(layers, X_train, phase='train') == y_train))
         test_acc.append(np.mean(scores(layers, X_test, phase='train') == y_test))
 
+        y_train_pred = scores(layers, X_train, phase='train')
+        y_test_pred = scores(layers, X_test, phase='train')
+        train_f1.append(f1_score(y_train, y_train_pred, average='weighted'))
+        test_f1.append(f1_score(y_test, y_test_pred, average='weighted'))
+
         print(f"Epoch {i + 1}/{epochs}")
         print("Train loss:", train_loss[-1])
         print("Validation loss:", test_loss[-1])
@@ -188,15 +208,32 @@ def train(args: str = None):
         print("Validation accuracy:", test_acc[-1])
         print("\n")
 
-    plt.figure(figsize=(12, 4))
-    plt.subplot(1, 2, 1)
-    plt.plot(train_loss, label='train loss')
-    plt.plot(test_loss, label='test loss')
-    plt.legend()
-    plt.subplot(1, 2, 2)
-    plt.plot(train_acc, label='train accuracy')
-    plt.plot(test_acc, label='test accuracy')
-    plt.legend()
+        if args.earlystop:
+            if test_loss[-1] < best_val_loss:
+                best_val_loss = test_loss[-1]
+                patience_counter = 0
+            else:
+                patience_counter += 1
+
+            if patience_counter >= 500:
+                print("Early stopping triggered")
+                break
+
+        # Update live plot
+        if i % 10 == 0:
+            ax[0].plot(train_loss, 'b-', label='train loss' if i == 0 else "")
+            ax[0].plot(test_loss, 'r-', label='test loss' if i == 0 else "")
+            ax[1].plot(train_acc, 'b-', label='train accuracy' if i == 0 else "")
+            ax[1].plot(test_acc, 'r-', label='test accuracy' if i == 0 else "")
+            ax[2].plot(range(len(train_f1)), train_f1, label='Train F1-Score')
+            ax[2].plot(range(len(test_f1)), test_f1, label='Test F1-Score')
+            if i == 0:
+                ax[0].legend()
+                ax[1].legend()
+                ax[2].legend()
+            plt.pause(0.01)
+
+    plt.ioff()
     plt.show()
 
     try:
