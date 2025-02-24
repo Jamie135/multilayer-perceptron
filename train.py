@@ -174,9 +174,6 @@ def train(args: str = None):
     # Initialize live plot
     plt.ion()
     fig, ax = plt.subplots(3, 1, figsize=(10, 12))
-    ax[0].set_title('Loss')
-    ax[1].set_title('Accuracy')
-    ax[2].set_title('F1-Score')
     ax[0].set_xlabel('Epoch')
     ax[1].set_xlabel('Epoch')
     ax[2].set_xlabel('Epoch')
@@ -215,7 +212,7 @@ def train(args: str = None):
             else:
                 patience_counter += 1
 
-            if patience_counter >= 500:
+            if patience_counter >= 250:
                 print("Early stopping triggered")
                 break
 
