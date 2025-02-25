@@ -257,7 +257,7 @@ def train(args: str = None):
             else:
                 patience_counter += 1
 
-            if patience_counter >= 300:
+            if patience_counter >= 50 and best_val_loss - test_loss[-1] > 0.15:
                 print("Early stopping triggered")
                 break
 
