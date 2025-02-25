@@ -193,6 +193,21 @@ def train(args: str = None):
 
     best_val_loss = float('inf')
     patience_counter = 0
+
+    # Dictionary to store metrics
+    metrics = {
+        'train_loss': [],
+        'test_loss': [],
+        'train_acc': [],
+        'test_acc': [],
+        'train_precision': [],
+        'test_precision': [],
+        'train_recall': [],
+        'test_recall': [],
+        'train_f1': [],
+        'test_f1': []
+    }
+
     for i in range(epochs):
         for X_batch, y_batch in minibatches(X_train, y_train):
             propagation(layers, X_batch, y_batch)
@@ -212,6 +227,22 @@ def train(args: str = None):
         train_f1.append(f1_score(y_train, y_train_pred, average='weighted'))
         test_f1.append(f1_score(y_test, y_test_pred, average='weighted'))
 
+        # Update metrics dictionary
+        metrics['train_loss'].append(train_loss[-1])
+        metrics['test_loss'].append(test_loss[-1])
+        metrics['train_acc'].append(train_acc[-1])
+        metrics['test_acc'].append(test_acc[-1])
+        metrics['train_precision'].append(train_precision[-1])
+        metrics['test_precision'].append(test_precision[-1])
+        metrics['train_recall'].append(train_recall[-1])
+        metrics['test_recall'].append(test_recall[-1])
+        metrics['train_f1'].append(train_f1[-1])
+        metrics['test_f1'].append(test_f1[-1])
+
+        # Save metrics to JSON file
+        with open('metrics.json', 'w') as f:
+            json.dump(metrics, f)
+
         print(f"Epoch {i + 1}/{epochs}")
         print("Train loss:", train_loss[-1])
         print("Validation loss:", test_loss[-1])
@@ -226,7 +257,7 @@ def train(args: str = None):
             else:
                 patience_counter += 1
 
-            if patience_counter >= 250:
+            if patience_counter >= 300:
                 print("Early stopping triggered")
                 break
 
