@@ -4,8 +4,10 @@ import json
 import argparse
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from sklearn.metrics import f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from layers import *
@@ -166,6 +168,10 @@ def train(args: str = None):
     test_loss = []
     train_acc = []
     test_acc = []
+    train_precision = []
+    test_precision = []
+    train_recall = []
+    test_recall = []
     train_f1 = []
     test_f1 = []
 
@@ -173,13 +179,17 @@ def train(args: str = None):
 
     # Initialize live plot
     plt.ion()
-    fig, ax = plt.subplots(3, 1, figsize=(10, 12))
+    fig, ax = plt.subplots(5, 1, figsize=(10, 12))
     ax[0].set_xlabel('Epoch')
     ax[1].set_xlabel('Epoch')
     ax[2].set_xlabel('Epoch')
+    ax[3].set_xlabel('Epoch')
+    ax[4].set_xlabel('Epoch')
     ax[0].set_ylabel('Loss')
     ax[1].set_ylabel('Accuracy')
-    ax[2].set_ylabel('F1-Score')
+    ax[2].set_ylabel('Precision')
+    ax[3].set_ylabel('Recall')
+    ax[4].set_ylabel('F1-Score')
 
     best_val_loss = float('inf')
     patience_counter = 0
@@ -190,11 +200,15 @@ def train(args: str = None):
 
         train_loss.append(propagation(layers, X_train, y_train))
         test_loss.append(propagation(layers, X_test, y_test))
-        train_acc.append(np.mean(scores(layers, X_train, phase='train') == y_train))
-        test_acc.append(np.mean(scores(layers, X_test, phase='train') == y_test))
+        train_acc.append(accuracy_score(y_train, scores(layers, X_train, phase='train')))
+        test_acc.append(accuracy_score(y_test, scores(layers, X_test, phase='train')))
 
         y_train_pred = scores(layers, X_train, phase='train')
         y_test_pred = scores(layers, X_test, phase='train')
+        train_precision.append(precision_score(y_train, y_train_pred, average='weighted'))
+        test_precision.append(precision_score(y_test, y_test_pred, average='weighted'))
+        train_recall.append(recall_score(y_train, y_train_pred, average='weighted'))
+        test_recall.append(recall_score(y_test, y_test_pred, average='weighted'))
         train_f1.append(f1_score(y_train, y_train_pred, average='weighted'))
         test_f1.append(f1_score(y_test, y_test_pred, average='weighted'))
 
@@ -218,16 +232,22 @@ def train(args: str = None):
 
         # Update live plot
         if i % 10 == 0:
-            ax[0].plot(train_loss, 'b-', label='train loss' if i == 0 else "")
-            ax[0].plot(test_loss, 'r-', label='test loss' if i == 0 else "")
-            ax[1].plot(train_acc, 'b-', label='train accuracy' if i == 0 else "")
-            ax[1].plot(test_acc, 'r-', label='test accuracy' if i == 0 else "")
-            ax[2].plot(range(len(train_f1)), train_f1, label='Train F1-Score')
-            ax[2].plot(range(len(test_f1)), test_f1, label='Test F1-Score')
+            ax[0].plot(train_loss, 'b-', label='Train Loss' if i == 0 else "")
+            ax[0].plot(test_loss, 'r-', label='Test Loss' if i == 0 else "")
+            ax[1].plot(train_acc, 'b-', label='Train Accuracy' if i == 0 else "")
+            ax[1].plot(test_acc, 'r-', label='Test Accuracy' if i == 0 else "")
+            ax[2].plot(train_precision, 'b-', label='Train Precision' if i == 0 else "")
+            ax[2].plot(test_precision, 'r-', label='Test Precision' if i == 0 else "")
+            ax[3].plot(train_recall, 'b-', label='Train Recall' if i == 0 else "")
+            ax[3].plot(test_recall, 'r-', label='Test Recall' if i == 0 else "")
+            ax[4].plot(range(len(train_f1)), train_f1, 'b-', label='Train F1-Score')
+            ax[4].plot(range(len(test_f1)), test_f1, 'r-',label='Test F1-Score')
             if i == 0:
                 ax[0].legend()
                 ax[1].legend()
                 ax[2].legend()
+                ax[3].legend()
+                ax[4].legend()
             plt.pause(0.01)
 
     plt.ioff()
@@ -246,6 +266,9 @@ def main():
         train(args)
     except FileNotFoundError as f:
         print(f)
+        sys.exit(1)
+    except KeyboardInterrupt as k:
+        print(k)
         sys.exit(1)
     except ValueError as v:
         print(v)

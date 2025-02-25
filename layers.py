@@ -46,6 +46,7 @@ class Dense(Layer):
         else:
             raise ValueError("Invalid initialization,use 'he' or 'lecun'")
 
+        np.random.seed(2)
         self.input_unit = input_unit
         self.weights = np.random.uniform(-limit, limit, size=(input_unit, output_unit))
         self.biases = np.zeros(output_unit)
